@@ -11,6 +11,10 @@ from scipy.special import j0, y0
 from numpy.fft import fft, ifft
 from gaussian_process import GaussianProcess
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=RuntimeWarning)
+    import imp
 
 class Environnement():
 
