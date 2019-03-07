@@ -24,39 +24,39 @@ class Environnement():
             (np.nan_to_num(j0(w * np.linalg.norm(x - y))) + 1j * np.nan_to_num(
                 y0(w * np.linalg.norm(x - y))))
         self.G = lambda t, x, y: np.nan_to_num(
-            1 / (2 * np.pi) * (t**2 > np.dot(x - y, x - y)) / np.sqrt(t**2 - np.dot(x - y, x - y)))
+            1 / (2 * np.pi) * (t**2 > np.dot(x - y, x - y)) / np.sqrt(t**2 - 
+                np.dot(x - y, x - y)))
         self.nb_timesteps = nb_timesteps
         self.seed = seed
+        thetas = np.random.uniform(size= N)
+        self.y = np.zeros((N, 2))
+        self.y[:, 0] = self.L * np.cos(2 * np.pi * thetas)
+        self.y[:, 1] = self.L * np.sin(2 * np.pi * thetas)
 
-    def compute_signal(self, x1, x2, tau, T, eps=0):
+    def compute_signal(self, x1, x2, tau, T, N,eps=0):
 
-        time_discretization = np.linspace(eps, T, self.nb_timesteps)
-        thetas = np.random.uniform(size=self.N)
-        y = np.zeros((self.N, 2))
-        y[:, 0] = self.L * np.cos(2 * np.pi * thetas)
-        y[:, 1] = self.L * np.sin(2 * np.pi * thetas)
-
+        time_discretization = np.linspace(eps, T, self.nb_timesteps)        
         def cov(x): return np.exp(-x**2 / 4) * (2 - x**2) / (4 * np.sqrt(2))
         gp = GaussianProcess(cov)
         signal_x1 = 0
         signal_x2 = 0
-        for i in range(self.N):
+        for i in range(N):
             temp_gp = gp.generate_n_var(
                 self.nb_timesteps, time_discretization, fourier=False)
-            temp_G1 = fft(self.G(time_discretization, x1, y[i]))
-            temp_G2 = fft(self.G(time_discretization + tau, x2, y[i]))
+            temp_G1 = fft(self.G(time_discretization, x1, self.y[i]))
+            temp_G2 = fft(self.G(time_discretization + tau, x2, self.y[i]))
             signal_x1 += np.real(ifft(temp_G1 * temp_gp))
             signal_x2 += np.real(ifft(temp_G2 * temp_gp))
-        return self.L / np.sqrt(self.N) * \
-            signal_x1, self.L / np.sqrt(self.N) * \
-            signal_x2, time_discretization, y
+        return self.L / np.sqrt(N) * \
+            signal_x1, self.L / np.sqrt(N) * \
+            signal_x2, time_discretization, self.y
 
 
 if __name__ == '__main__':
     env = Environnement(N=50, nb_timesteps = 101)
     x1 = x2 = np.ones(2)
     tau = 1
-    u, u_lagged, time = env.compute_signal(x1, x2, tau, 100)
+    u, u_lagged, time, _ = env.compute_signal(x1, x2, tau, 50, 100)
     import pylab as plt
     plt.scatter(time, u, color='red', label='u')
     plt.scatter(time, u_lagged, color='blue', label='u_lagged')

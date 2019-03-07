@@ -5,20 +5,16 @@ Created on Fri Mar  1 09:21:30 2019
 
 @author: evrardgarcelon
 """
-# TODO  Too Long execution time
 
 import numpy as np
-#import datetime as dt
 
 from environnement import Environnement
 from scipy.integrate import quad
 import pylab as plt
 from tqdm import tqdm
+from scipy.special import j0
+from scipy.stats import randint
 
-# import os
-# import pickle
-
-# from src.tools.utils import create_dir
 
 import warnings
 
@@ -36,213 +32,108 @@ def complex_integration(f, a, b, eps=10**-5):
         return real_part + imag_part
     else:
         raise Exception('Integral not computed')
-    return quad(real_f, a, b)[0] + 1j * quad(imag_f, a, b)[0]
 
 
-class Experience(object):
+F_hat = lambda w : w**2*np.exp(-w**2)
 
-    def __init__(self, T=100,
-                 N=20,
-                 L=50,
-                 tau=1,
-                 F=None,
-                 F_hat=None,
-                 seed=1,
-                 c0=1,
-                 folder='experiment',
-                 exp_name='green_function_estimation',
-                 verbose = False):
+def emp_cross_corr(tau, x1, x2, T, N, env, verbose = True) :
+    if verbose : 
+        print('Computing emp_cross_corr ...')
+    u1, u2_lagged, dicretization, _ = env.compute_signal(x1, x2, tau, T, N)
+    integral = 0
+    for i in range(len(dicretization) - 1) :
+        integral += u1[i]*u2_lagged[i]*(dicretization[i+1] - dicretization[i])/T
+    if verbose : 
+        print('Done')
+    return integral
 
-        #        date = dt.datetime.today()
-        #        string_date = "_".join([
-        #            str(date.year).zfill(4),
-        #            str(date.month).zfill(2),
-        #            str(date.day).zfill(2),
-        #            str(date.hour).zfill(2),
-        #            str(date.minute).zfill(2)
-        #        ])
-        #        self.folder = os.path.join(folder, string_date, exp_name)
-        #        create_dir(self.folder)
+def exp_emp_cross_cor(tau, x1, x2, N, env, verbose = True) : 
+    if verbose : 
+        print('Computing exp_emp_cross_corr ...')
+    assert N == env.N
+    y = env.y
+    temp_cor = 0
+    for s in range(len(y)) :
+        temp_g = lambda w : np.conjugate(env.G_hat(w, x1, y[s]))*env.G_hat(w, y[s], x2)*np.exp(-1j*w*tau)*F_hat(w)
+        temp_cor += complex_integration(temp_g, a = -np.inf, b = + np.inf)/(2*np.pi*N)
+    if verbose : 
+        print('Done')
+    return temp_cor
 
-        self.env_parameters = {'c0': c0,
-                               'N': N,
-                               'L': L}
-        self.tau = tau
-        self.T = T
-        self.seed = seed
-
-        if F is None and F_hat is None:
-            self.F_hat = lambda w: w**2 * np.exp(-w**2)
-            self.F = lambda x: np.exp(-x**2 / 4) * \
-                (2 - x**2) / (4 * np.sqrt(2))
-        else:
-            self.F_hat = F_hat
-            self.F = F
-        self.env = Environnement(**self.env_parameters)
-        self.colors = ['red', 'green', 'blue', 'magenta', 'cyan', 'yellow', 'black', 'grey', 'orange']
-        self.verbose = verbose
-
-    def compute_signals(self, x1, x2, tau=None, T=None):
-
-        if tau is None:
-            tau = self.tau
-        if T is None:
-            T = self.T
-        u, u_lagged, time, _ = self.env.compute_signal(x1, x2, tau, T)
-        return u, u_lagged, time
-
-    def emp_cross_correlation(self, x1, x2, T=None, tau=None):
-        if self.verbose : 
-            print('Computing empirical cross correlation...')
-        if tau is None:
-            tau = self.tau
-        if T is None:
-            T = self.T
-        u, u_lagged, time_dicretization = self.compute_signals(x1, x2, tau, T)
-        emp_cross_cor = 1 / (T - time_dicretization[0]) * np.sum(
-            u[:-1] * u_lagged[:-1] * (time_dicretization[1::] - time_dicretization[:-1]))
-        if self.verbose : 
-            print('Done')
-        return emp_cross_cor
-
-    def exp_emp_cross_correlation(self, x1, x2, tau=None, N=None, L=None):
-        # Takes too long
-
-        if self.verbose : 
-            print('Computing expectation of empirical cross correlation ...')
-        if tau is None:
-            tau = self.tau
-        if N is None:
-            N = self.env_parameters['N']
-        if L is None:
-            L = self.env_parameters['L']
-        thetas = np.random.uniform(size=N)
-        y = np.zeros((N, 2))
-        y[:, 0] = L * np.cos(2 * np.pi * thetas)
-        y[:, 1] = L * np.sin(2 * np.pi * thetas)
-        G_hat = self.env.G_hat
-        temp_G_hat = lambda w : np.sum(np.array([np.conjugate(G_hat(w,x1, y[s]))*G_hat(w,x2, y[s]) for s in range(N)]))
-        f = lambda w : self.F_hat(w)*np.exp(-1j*tau*w)*temp_G_hat(w)
-        if self.verbose :
-            print('Done')
-        return complex_integration(f, a = -np.inf, b = np.inf)/ np.sqrt(2 * np.pi * N)
-
-    def cross_1(self, x1, x2, tau=None, L=None):
-        if self.verbose : 
+def cross_1(tau, x1, x2, L, env, verbose = True) :
+        if verbose : 
             print('Computing C_(1)...')
-        if L is None:
-            L = self.env_parameters['L']
-        if tau is None:
-            tau = self.tau
+            
+        def G_hat(w): return env.G_hat(w, x1, x2)
 
-        def G_hat(w): return self.env.G_hat(w, x1, x2)
-
-        def f(w): return self.F_hat(w)*np.imag(G_hat(w))*np.exp(-1j*tau*w)/w
+        def f(w): return F_hat(w)*np.imag(G_hat(w))*np.exp(-1j*tau*w)/w
         
         result = complex_integration(f, a=-np.inf, b=+np.inf)/(4*np.pi**2*L)
-        if self.verbose : 
+        if verbose : 
             print('Done')
         return result
 
-    def C_asy(self, x1, x2, tau=None):
-        # Zeros for all tau
-        if self.verbose : 
-            print('Computing C_asy ...')
-        if tau is None:
-            tau = self.tau
-        c0 = self.env_parameters['c0']
-        L = self.env_parameters['L']
-
- 
-        def dC_asy(t): return complex_integration(lambda s : self.env.G(s, x1, x2)*(self.F(t-s) + self.F(t+s)), 
-                   a=-np.inf, 
-                   b=+np.inf)
-        temp_C_asy = - c0 / (8 * np.pi**2 * L) * complex_integration(dC_asy, a=0, b=tau)
-        if self.verbose :
+def c_asy(tau, x1, x2, L, env, c0 = 1, verbose = True) :
+        if verbose : 
+            print('Computing C_asy ...') 
+        norm_x = np.linalg.norm(x1-x2)
+        f = lambda w : w*np.cos(w*tau)*np.exp(-w**2)*j0(norm_x*w)
+        temp_C_asy = - c0 / (8 * np.pi**2) * complex_integration(f, a= -np.inf, b=np.inf)
+        if verbose :
             print('Done')
         return temp_C_asy
 
-    def compare_all(self, x1, x2, low_tau, high_tau, T=None, L=None, N=None):
-        taus = np.linspace(low_tau, high_tau, 10)
-
-        #self.emp_cross_cors = []
-        self.exp_emp_cross_cors = []
-        self.cross_cors_1 = []
-        self.cross_asys = []
-
-        for tau in tqdm(taus):
-
-#            self.emp_cross_cors.append(
-#                self.emp_cross_correlation(
-#                    x1, x2, tau=tau, T=T))
-            self.exp_emp_cross_cors.append(
-                self.exp_emp_cross_correlation(
-                    x1, x2, tau=tau, L=L, N=N))
-            self.cross_cors_1.append(self.cross_1(x1, x2, tau=tau, L=L))
-            self.cross_asys.append(self.C_asy(x1, x2, tau=tau))
-#        self.emp_cross_cors = np.array(self.emp_cross_cors)
-        self.exp_emp_cross_cors = np.array(self.exp_emp_cross_cors)
-        self.cross_cors_1 = np.array(self.cross_cors_1)
-        self.cross_asys = np.array(self.cross_asys)
-        
-        plt.figure(0)       
-#        plt.plot(taus,self.emp_cross_cors,label = 'Empirical cross correlation',
-#                 marker = 'o', color = self.colors[0])
-        plt.plot(taus,self.exp_emp_cross_cors,label = 'Expectation of empirical cross correlation',
-                 marker = 'o', color = self.colors[1])
-        plt.plot(taus,self.cross_cors_1,label = 'Cross correlation 1',
-                 marker = 'o', color = self.colors[2])
-        plt.plot(taus,self.cross_asys,label = 'Asymmetrical cross correlation',
-                 marker = 'o', color = self.colors[3])
-        plt.legend()
-        plt.show()
-        
-    # TODO quel sorte de graphique à faire
-
-    def save_var(self, X, name):
-        try:
-            with open(name, "w") as f:
-                f.write(X)
-        except BaseException:
-            pass
-
-    def save_all(self):
-        print('Saving variables...')
-        names = {'emp_cross_cor': 'empirical_cross_correlation',
-                 'exp_emp_cross_cor': 'expectation_cross_correlation',
-                 'cross_1': 'cross_correlataion_(1)',
-                 'C_asy': 'cross_correlation_asymetrical'}
-        var = [
-            self.emp_cross_cors,
-            self.exp_emp_cross_cors,
-            self.cross_cors_1,
-            self.cross_asys]
-        for i, name in names.items:
-            self.save_var(var[i], name)
-        print('Done')
 
 
+    
 if __name__ == '__main__':
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore",category=RuntimeWarning)
-        experience = Experience()
-        x1 = np.ones(2)
-        x2 = 2 * np.ones(2)
-        import time
-        debut = time.clock()
-        emp_cross_correlation = experience.emp_cross_correlation(x1, x2)
-        fin = time.clock()
-        print("Temps d'éxécution emp cross cor: ", fin - debut)
-        debut = time.clock()
-        exp_emp_cross_cor = experience.exp_emp_cross_correlation(x1, x2)
-        fin = time.clock()
-        print("Temps d'éxécution exp_emp cross cor: ", fin - debut)
-        debut = time.clock()
-        cross_1 = experience.cross_1(x1, x2)
-        fin = time.clock()
-        print("Temps d'éxécution emp cross 1: ", fin - debut)
-        debut = time.clock()
-        C_asy = experience.C_asy(x1, x2)
-        fin = time.clock()
-        print("Temps d'éxécution C_asy : ", fin - debut)
-        experience.compare_all(x1, x2, low_tau = 1, high_tau = 10)
+        L, N, T = 50, 50, 10**3
+        x_to_test = []
+        X = np.zeros((5,2))
+        X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
+        experience ={}
+        for j in tqdm(range(1)) :
+            for i in range(j + 1, j+2) :
+                taus = np.linspace(1,6, 10)
+                env = Environnement(N = N, L = L)
+                x1,x2 = X[j], X[i]
+                emp_cross_corr1 = exp_emp_cross_cor1 = cross_corr_1 = cross_asy = []
+                for tau in taus :
+                    emp_cross_corr1.append(emp_cross_corr(tau, x1, x2, T, N, env, verbose = False))
+                    exp_emp_cross_cor1.append(exp_emp_cross_cor(tau, x1, x2, N, env, verbose = False))
+                    cross_corr_1.append(cross_1(tau, x1, x2, L, env, verbose = False))
+                    cross_asy.append(c_asy(tau, x1, x2, L,env, verbose = False))
+                emp_cross_corr1 = np.array(emp_cross_corr1)
+                exp_emp_cross_cor1 = np.array(exp_emp_cross_cor1)
+                cross_corr_1 = np.array(cross_corr_1)
+                cross_asy = np.array(cross_asy)
+                temp_dict = {'emp_cross_corr1' : emp_cross_corr1,
+                             'exp_emp_cross_cor1' : exp_emp_cross_cor1,
+                             'cross_corr_1' : cross_corr_1,
+                             'cross_asy' : cross_asy}
+                experience[(j,i)] = temp_dict
+        j,i = (0,1)
+        values = experience[(j,i)]
+        colors = ['b', 'g', 'r','c','m','y','k']
+        for key, val in values.items() :
+            U = randint(low = 0, high = len(colors)).rvs()
+            plt.plot(val, label= key, color = colors[U])
+        plt.legend()
+        plt.show()       
+        
+        
+        Ns,Ts = np.linspace(10,100), np.linspace(100,10**4)
+        c_tns = np.zeros((len(Ns), len(Ts)))
+        tau = 1
+        x1, x2 = X[0], X[1]
+        for i,j in zip(Ns,Ts) :
+            c_tns[i,j] = emp_cross_corr(tau, x1, x2, Ts[j], Ns[i])
+            
+        # TODO ecrire estimation de c0
+            
+            
+                
+                
+        
