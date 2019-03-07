@@ -42,7 +42,7 @@ def complex_integration(f, a, b, eps=10**-5):
 class Experience(object):
 
     def __init__(self, T=100,
-                 N=50,
+                 N=20,
                  L=50,
                  tau=1,
                  F=None,
@@ -106,6 +106,8 @@ class Experience(object):
         return emp_cross_cor
 
     def exp_emp_cross_correlation(self, x1, x2, tau=None, N=None, L=None):
+        # Takes too long
+
         if self.verbose : 
             print('Computing expectation of empirical cross correlation ...')
         if tau is None:
@@ -119,17 +121,13 @@ class Experience(object):
         y[:, 0] = L * np.cos(2 * np.pi * thetas)
         y[:, 1] = L * np.sin(2 * np.pi * thetas)
         G_hat = self.env.G_hat
-        temp_cor = 0
-        for s in range(N):
-            def f(w): return self.F_hat(w) * np.conjugate(G_hat(w, x1,
-                                                                y[s])) * G_hat(w, x2, y[s]) * np.exp(-1j * w * tau)
-            temp_cor += complex_integration(f, a=-np.inf, b=+np.inf)
+        temp_G_hat = lambda w : np.sum(np.array([np.conjugate(G_hat(w,x1, y[s]))*G_hat(w,x2, y[s]) for s in range(N)]))
+        f = lambda w : self.F_hat(w)*np.exp(-1j*tau*w)*temp_G_hat(w)
         if self.verbose :
             print('Done')
-        return temp_cor / np.sqrt(2 * np.pi * N)
+        return complex_integration(f, a = -np.inf, b = np.inf)/ np.sqrt(2 * np.pi * N)
 
     def cross_1(self, x1, x2, tau=None, L=None):
-        # Takes too long
         if self.verbose : 
             print('Computing C_(1)...')
         if L is None:
@@ -137,17 +135,17 @@ class Experience(object):
         if tau is None:
             tau = self.tau
 
-        def G_hat(w, x, theta): return self.env.G_hat(
-            w, x, L * np.array([np.cos(theta), np.sin(theta)]))
+        def G_hat(w): return self.env.G_hat(w, x1, x2)
 
-        def f(theta): return complex_integration(lambda w: self.F_hat(w) * np.conjugate(G_hat(w, x1, theta)) *
-                                                 G_hat(w, x2, theta) * np.exp(-1j * w * tau), a=-np.inf, b=np.inf)
-        result = complex_integration(f, a=0, b=2 * np.pi)
+        def f(w): return self.F_hat(w)*np.imag(G_hat(w))*np.exp(-1j*tau*w)/w
+        
+        result = complex_integration(f, a=-np.inf, b=+np.inf)/(4*np.pi**2*L)
         if self.verbose : 
             print('Done')
         return result
 
     def C_asy(self, x1, x2, tau=None):
+        # Zeros for all tau
         if self.verbose : 
             print('Computing C_asy ...')
         if tau is None:
@@ -155,46 +153,41 @@ class Experience(object):
         c0 = self.env_parameters['c0']
         L = self.env_parameters['L']
 
-        def temp_f(t): return self.F(t) * self.env.G(tau - t, x1, x2)
-
-        def temp_rev_f(t): return self.F(t) * self.env.G(t - tau, x1, x2)
-
-        def temp(t): return temp_f(t) - temp_rev_f(t)
-
-        def dC_asy(tau): return - c0 / (8 * np.pi**2 * L) * \
-            quad(temp, a=-np.inf, b=np.inf)[0]
-        temp_C_asy = complex_integration(dC_asy, a=- np.inf, b=tau)
+ 
+        def dC_asy(t): return complex_integration(lambda s : self.env.G(s, x1, x2)*(self.F(t-s) + self.F(t+s)), 
+                   a=-np.inf, 
+                   b=+np.inf)
+        temp_C_asy = - c0 / (8 * np.pi**2 * L) * complex_integration(dC_asy, a=0, b=tau)
         if self.verbose :
             print('Done')
         return temp_C_asy
 
     def compare_all(self, x1, x2, low_tau, high_tau, T=None, L=None, N=None):
-        # Rajouter tqdm
         taus = np.linspace(low_tau, high_tau, 10)
 
-        self.emp_cross_cors = []
+        #self.emp_cross_cors = []
         self.exp_emp_cross_cors = []
         self.cross_cors_1 = []
         self.cross_asys = []
 
         for tau in tqdm(taus):
 
-            self.emp_cross_cors.append(
-                self.emp_cross_correlation(
-                    x1, x2, tau=tau, T=T))
+#            self.emp_cross_cors.append(
+#                self.emp_cross_correlation(
+#                    x1, x2, tau=tau, T=T))
             self.exp_emp_cross_cors.append(
                 self.exp_emp_cross_correlation(
                     x1, x2, tau=tau, L=L, N=N))
             self.cross_cors_1.append(self.cross_1(x1, x2, tau=tau, L=L))
             self.cross_asys.append(self.C_asy(x1, x2, tau=tau))
-        self.emp_cross_cors = np.array(self.emp_cross_cors)
+#        self.emp_cross_cors = np.array(self.emp_cross_cors)
         self.exp_emp_cross_cors = np.array(self.exp_emp_cross_cors)
         self.cross_cors_1 = np.array(self.cross_cors_1)
         self.cross_asys = np.array(self.cross_asys)
         
         plt.figure(0)       
-        plt.plot(taus,self.emp_cross_cors,label = 'Empirical cross correlation',
-                 marker = 'o', color = self.colors[0])
+#        plt.plot(taus,self.emp_cross_cors,label = 'Empirical cross correlation',
+#                 marker = 'o', color = self.colors[0])
         plt.plot(taus,self.exp_emp_cross_cors,label = 'Expectation of empirical cross correlation',
                  marker = 'o', color = self.colors[1])
         plt.plot(taus,self.cross_cors_1,label = 'Cross correlation 1',
@@ -235,12 +228,21 @@ if __name__ == '__main__':
         experience = Experience()
         x1 = np.ones(2)
         x2 = 2 * np.ones(2)
-#        import time
-#        debut = time.clock()
-#        emp_cross_correlation = experience.emp_cross_correlation(x1, x2)
-#        exp_emp_cross_cor = experience.exp_emp_cross_correlation(x1, x2)
-#        cross_1 = experience.cross_1(x1, x2)
-#        C_asy = experience.C_asy(x1, x2)
-#        fin = time.clock()
-#        print("Temps d'éxécution : ", fin - debut)
+        import time
+        debut = time.clock()
+        emp_cross_correlation = experience.emp_cross_correlation(x1, x2)
+        fin = time.clock()
+        print("Temps d'éxécution emp cross cor: ", fin - debut)
+        debut = time.clock()
+        exp_emp_cross_cor = experience.exp_emp_cross_correlation(x1, x2)
+        fin = time.clock()
+        print("Temps d'éxécution exp_emp cross cor: ", fin - debut)
+        debut = time.clock()
+        cross_1 = experience.cross_1(x1, x2)
+        fin = time.clock()
+        print("Temps d'éxécution emp cross 1: ", fin - debut)
+        debut = time.clock()
+        C_asy = experience.C_asy(x1, x2)
+        fin = time.clock()
+        print("Temps d'éxécution C_asy : ", fin - debut)
         experience.compare_all(x1, x2, low_tau = 1, high_tau = 10)
