@@ -106,11 +106,10 @@ if __name__ == '__main__':
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2 = X[0], X[1]/100
-    tau = 0.1
-    eps = 10**3
+    tau = 2
     fourier_cov = lambda w : np.exp(-w**2)
-    env = Environnement(nb_timesteps = T/tau, L = L, N = N, fourier_cov= fourier_cov)
-    u1,u2,times,_ = env.compute_signal(x1, x2, T, tau) 
+    env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
+    u1,u2,times,_ = env.compute_signal(x1, x2, T) 
     import time
     debut = time.clock()
     C_TN, C_TN2 = emp_cross_corr(u1, u2, times, verbose=True)
