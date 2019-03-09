@@ -8,56 +8,104 @@ Created on Thu Feb 21 16:12:47 2019
 
 import numpy as np
 from scipy.special import j0, y0
-from numpy.fft import fft, ifft
-from gaussian_process import GaussianProcess
+from numpy.fft import fft, ifft, fftfreq
+from scipy.integrate import quad
+
+
+def generate_n_gp(time_points, fourier_cov, eps=10**-5):
+        
+    assert isinstance(time_points, np.ndarray)
+    
+    n = len(time_points)
+    y_fourier = fft(np.random.randn(n))
+    delta_t = time_points[1] - time_points[0]
+    freqs = fftfreq(n, d=delta_t)
+    z_fourier = np.sqrt(fourier_cov(freqs)) * y_fourier
+    return np.real(ifft(z_fourier))
+
+def cplx_quad(f,a,b) :
+    
+    real_f = lambda x : np.real(f(x))
+    
+    return quad(real_f,a,b)[0] 
 
 
 class Environnement():
 
-    def __init__(self, c0=1, L=50, N=10,
-                 nb_timesteps=100, seed=1):
+    def __init__(self, c0=1, L=50, N=50, nb_timesteps=100, fourier_cov = lambda w : w**2*np.exp(-w**2)) :
 
         self.L = L
         self.N = N
         self.c0 = c0
-        self.G_hat = lambda w, x, y: 1j / 4 * \
-            (np.nan_to_num(j0(w * np.linalg.norm(x - y))) + 1j * np.nan_to_num(
-                y0(w * np.linalg.norm(x - y))))
-        self.G = lambda t, x, y: np.nan_to_num(
-            1 / (2 * np.pi) * (t**2 > np.dot(x - y, x - y)) / np.sqrt(t**2 - 
-                np.dot(x - y, x - y)))
         self.nb_timesteps = nb_timesteps
-        self.seed = seed
-        thetas = np.random.uniform(size= N)
-        self.y = np.zeros((N, 2))
-        self.y[:, 0] = self.L * np.cos(2 * np.pi * thetas)
-        self.y[:, 1] = self.L * np.sin(2 * np.pi * thetas)
+        thetas = np.random.uniform(size=N)
+        self.ys = np.zeros((N, 2))
+        self.ys[:, 0] = self.L * np.cos(2 * np.pi * thetas)
+        self.ys[:, 1] = self.L * np.sin(2 * np.pi * thetas)
+        self.fourier_cov = fourier_cov
 
-    def compute_signal(self, x1, x2, tau, T, N,eps=0):
+    def G_hat(self,w, x, y) : 
+            norme = np.linalg.norm(x - y)/self.c0
+            return 1j/4*(j0(w*norme) + 1j*y0(w*norme))
+        
+    def G(self,t, x, y) : 
+            norm = np.linalg.norm(x - y)/self.c0
+            if t > norm : 
+                return 1/(2*np.pi*np.sqrt(t**2 - norm**2))
+            else : 
+                return 0
+    def fourier_gaussian(self,w) :
+    
+        temp_y = np.random.randn(4)
+        C = np.eye(4)/2
+        C[2,0] = C[0,2]  = 1/2
+        C[3,1] = C[1,3] = -1/2
+        cplx_gaussian = np.dot(C,temp_y)
+        return cplx_gaussian[0]
+    
+    def solutions_one_source(self, t, y, x1, x2) :
+        TT  = 10**3
+        norme_1 = np.linalg.norm(y - x1)
+        norme_2 = np.linalg.norm(y - x2)
+        time_points = np.linspace(1, TT)
+        points_1 = time_points - norme_1*time_points
+        points_2 = time_points - norme_2*time_points
+        points = np.concatenate(points_1)
+        gps = generate_n_gp(t - time_points, self.fourier_cov)
+        
+        sol_1 = 0
+        sol_2 = 0
+        for i in range(len(time_points)) :
+            sol_1 += self.G(time_points[i],x1,y)*gps[i]
+            sol_2 += self.G(time_points[i],x2,y)*gps[i]
+        
+        print(sol_1)
+        return  sol_1, sol_2
 
-        time_discretization = np.linspace(eps, T, self.nb_timesteps)        
-        def cov(x): return np.exp(-x**2 / 4) * (2 - x**2) / (4 * np.sqrt(2))
-        gp = GaussianProcess(cov)
-        signal_x1 = 0
-        signal_x2 = 0
-        for i in range(N):
-            temp_gp = gp.generate_n_var(
-                self.nb_timesteps, time_discretization, fourier=False)
-            temp_G1 = fft(self.G(time_discretization, x1, self.y[i]))
-            temp_G2 = fft(self.G(time_discretization + tau, x2, self.y[i]))
-            signal_x1 += np.real(ifft(temp_G1 * temp_gp))
-            signal_x2 += np.real(ifft(temp_G2 * temp_gp))
-        return self.L / np.sqrt(N) * \
-            signal_x1, self.L / np.sqrt(N) * \
-            signal_x2, time_discretization, self.y
+    def compute_signal(self, x1, x2, T, tau):
+
+        time_discretization = np.linspace(0, T, self.nb_timesteps)
+        signal_x1 = 0*time_discretization
+        signal_x2 = 0*time_discretization
+        for i in range(len(time_discretization)) :
+            t = time_discretization[i]
+            for j in range(len(self.ys)):
+                temp1,temp2 = self.solutions_one_source(t, self.ys[j], x1, x2)
+                signal_x1[i] += temp1
+                signal_x2[i] += temp2
+                
+        return self.c0/ np.sqrt(self.N) * \
+            signal_x1, self.c0/ np.sqrt(self.N) * \
+            signal_x2, time_discretization, self.ys
 
 
 if __name__ == '__main__':
-    env = Environnement(N=50, nb_timesteps = 101)
+    env = Environnement(N=1, nb_timesteps= 111, c0 = 1, L = 5)
     x1 = x2 = np.ones(2)
-    tau = 1
-    u, u_lagged, time, _ = env.compute_signal(x1, x2, tau, 50, 100)
+    x2 = x2
+    tau = 0
+    u1, u2, time, _ = env.compute_signal(x1, x2, 100, tau)
     import pylab as plt
-    plt.scatter(time, u, color='red', label='u')
-    plt.scatter(time, u_lagged, color='blue', label='u_lagged')
+    plt.scatter(time, u1, color='red', label='u1')
+    plt.scatter(time, u2, color='blue', label='u2')
     plt.legend()
