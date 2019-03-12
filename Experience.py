@@ -24,18 +24,18 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     
     if verbose:
         print('Computing emp_cross_corr ...')
+        
     M = len (u_1)
     u1_tilde = np.zeros(2*M-1)
     u1_tilde[M-1:] = u_1
     u2_tilde = np.zeros(2*M-1)
     u2_tilde[M-1:] = u_2
-    DFT_CT = (fft(u2_tilde)*np.conjugate(fft(u1_tilde)))*(-1)**np.linspace(0,2*M-2,2*M-1,dtype = 'int')
+    DFT_CT = fft(u2_tilde)*fft(u1_tilde)
     
     
     if verbose:
         print('Done')
-    return np.real(ifft(DFT_CT)),ifft(DFT_CT)
-    #return np.sum(u1[:-1]*u2[:-1]*(times[1:] - times[:-1]))/T, 1
+    return 4*np.real(ifft(DFT_CT))
 
 def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
     if verbose:
@@ -52,14 +52,36 @@ def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
         norme_2 = np.linalg.norm(x2 - y)/c0
         a, b = 0, +np.inf
         inte_1,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*y0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
-        inte_2,_ = quad(lambda w : -F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 100)
-        inte_3,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 100)
+        inte_2,_ = quad(lambda w : F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 100)
+        inte_3,_ = quad(lambda w : -F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 100)
         inte_4,_ = quad(lambda w : F_hat(w)*j0(w*norme_1)*j0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
         temp_cor += 1/8*(inte_1 + inte_2 + inte_3 + inte_4)
     if verbose:
         print('Done')
-    return temp_cor/N
+    return temp_cor/(np.pi**2*N)
 
+def cross_1(tau, x1, x2, L, env, verbose=True):
+
+    if verbose:
+        print('Computing Cross_1 ...')
+    F_hat = lambda w : env.fourier_cov(w)
+    c0 = env.c0
+    def f(theta):
+        y = L*np.array([np.cos(theta),np.sin(theta)])
+        norme_1 = np.linalg.norm(x1 - y)/c0
+        norme_2 = np.linalg.norm(x2 - y)/c0
+        a, b = 0, +np.inf
+        inte_1,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*y0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
+        inte_2,_ = quad(lambda w : F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 100)
+        inte_3,_ = quad(lambda w : -F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 100)
+        inte_4,_ = quad(lambda w : F_hat(w)*j0(w*norme_1)*j0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
+        return  1/8*(inte_1 + inte_2 + inte_3 + inte_4)
+    b = 2 * np.pi
+    a = 0
+    result,error = quad(f, a, b)
+    if verbose:
+        print('Done')
+    return result / (2 * np.pi**3)
 
 def C_asy(tau, x1, x2,  env, verbose=True):
     if verbose:
@@ -67,36 +89,15 @@ def C_asy(tau, x1, x2,  env, verbose=True):
 
     norme = np.linalg.norm(x1-x2)/env.c0
     def f(w): return env.fourier_cov(w) * j0(w*norme) * np.cos(w*tau) / w
-    
 
-    result = env.c0*quad(f, a=-np.inf, b=+np.inf)[0] / (8*np.pi)
+    result = env.c0*quad(f, a=0, b=+np.inf)[0]/(4*np.pi**3)
 
     if verbose:
         print('Done')
     return result
 
 
-def cross_1(tau, x1, x2, L, env, verbose=True):
 
-    if verbose:
-        print('Computing Cross_1 ...')
-    F_hat = lambda w : env.fourier_cov(w)
-    def f(theta):
-        y = L*np.array([np.cos(theta), np.sin(theta)])
-        norme_1 = np.linalg.norm(x1 - y)/env.c0
-        norme_2 = np.linalg.norm(x2 - y)/env.c0
-        a, b = 0, +np.inf
-        inte_1,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*y0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
-        inte_2,_ = quad(lambda w : -F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 100)
-        inte_3,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 100)
-        inte_4,_ = quad(lambda w : F_hat(w)*j0(w*norme_1)*j0(w*norme_2)*np.cos(w*tau),a,b, limit = 100)
-        return 1/8*(inte_1 + inte_2 + inte_3 + inte_4)
-    b = 2 * np.pi
-    a = 0
-    result,error = quad(f, a, b)
-    if verbose:
-        print('Done')
-    return result / (2 * np.pi)
 
 
 
@@ -105,16 +106,16 @@ if __name__ == '__main__':
     L, N, T = 50, 100, 10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
-    x1, x2 = X[0], X[1]/100
+    x1, x2 = X[0], X[0]
     tau = 2
-    fourier_cov = lambda w : np.exp(-w**2)
+    fourier_cov = lambda w : w**2*np.exp(-w**2)
     env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
-    u1,u2,times,_ = env.compute_signal(x1, x2, T) 
+#    u1,u2,times,_ = env.compute_signal(x1, x2, T) 
     import time
-    debut = time.clock()
-    C_TN, C_TN2 = emp_cross_corr(u1, u2, times, verbose=True)
-    fin = time.clock()
-    print('Temps emp_cross_corr : ', fin - debut)
+#    debut = time.clock()
+#    C_TN = emp_cross_corr(u1, u2, times, verbose=True)
+#    fin = time.clock()
+#    print('Temps emp_cross_corr : ', fin - debut)
     debut = time.clock()
     exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
     fin = time.clock()
@@ -127,6 +128,9 @@ if __name__ == '__main__':
     c_asy = C_asy(tau, x1, x2, env)
     fin = time.clock()
     print('Temps C_asy : ', fin - debut)
+    
+    print('Erreur : ', np.abs(c_1 - exp_emp_corr)/np.abs(c_1))
+#    plt.plot(C_TN)
 #    env = Environnement(N = N, L = L, c0 = 1)
 #    #tau = 0
 #    C_TN = emp_cross_corr(tau, x1, x2, T, N, env)
