@@ -15,6 +15,7 @@ from tqdm import tqdm
 from scipy.special import j0, y0
 from scipy.stats import randint
 from numpy.fft import fft, ifft
+from scipy.signal import fftconvolve
 
 
 import warnings
@@ -24,18 +25,20 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     
     if verbose:
         print('Computing emp_cross_corr ...')
-        
     M = len (u_1)
-    u1_tilde = np.zeros(2*M-1)
-    u1_tilde[M-1:] = u_1
-    u2_tilde = np.zeros(2*M-1)
-    u2_tilde[M-1:] = u_2
-    DFT_CT = fft(u2_tilde)*fft(u1_tilde)
-    
-    
+    u1_tilde = np.zeros(2*M)
+    u1_tilde[M:] = u_1
+    u2_tilde = np.zeros(2*M)
+    u2_tilde[M:] = u_2
+    other_cross = np.zeros(M)
+    for k in range(M) :
+        for j in range(2*M) :
+            other_cross[k] += 1/M*u1_tilde[j]*u2_tilde[(j+k)%(2*M)]
+    DFT_CT = fft(u2_tilde)*np.conjugate(fft(u1_tilde))*(-1)**np.linspace(0,2*M-1,2*M,dtype = 'int')
+    result = fftconvolve(u1[:-1],u2[1:])
     if verbose:
         print('Done')
-    return 4*np.real(ifft(DFT_CT))
+    return result, other_cross
 
 def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
     if verbose:
@@ -97,25 +100,36 @@ def C_asy(tau, x1, x2,  env, verbose=True):
     return result
 
 
+def plot_exp(env,X) :
+    plt.figure(50)
+    plt.scatter(X[:,0],X[:,1],marker = '^', color = 'red', label = 'x')
+    y = env.ys
+    plt.scatter(y[:,0],y[:,1],marker = 'o', color = 'green', label = 'sources')
+    plt.legend()
+    plt.show()
 
 
 
 
 if __name__ == '__main__':
 
-    L, N, T = 50, 100, 10**3
+    L, N, T = 50, 100, 3*10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
-    x1, x2 = X[0], X[0]
+    x1, x2 = X[0], X[1]
     tau = 2
     fourier_cov = lambda w : w**2*np.exp(-w**2)
-    env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
-#    u1,u2,times,_ = env.compute_signal(x1, x2, T) 
+    mean = []
     import time
-#    debut = time.clock()
-#    C_TN = emp_cross_corr(u1, u2, times, verbose=True)
-#    fin = time.clock()
-#    print('Temps emp_cross_corr : ', fin - debut)
+    debut = time.clock()
+    for i in range(1) : 
+        env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
+        u1,u2,times,_ = env.compute_signal(x1, x2, T) 
+        C_TN,other_cross = emp_cross_corr(u1, u2, times, verbose=True)
+        mean.append(C_TN[0])
+    fin = time.clock()
+    mean = np.mean(np.array(mean))
+    print('Temps emp_cross_corr : ', fin - debut)
     debut = time.clock()
     exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
     fin = time.clock()
@@ -129,8 +143,10 @@ if __name__ == '__main__':
     fin = time.clock()
     print('Temps C_asy : ', fin - debut)
     
-    print('Erreur : ', np.abs(c_1 - exp_emp_corr)/np.abs(c_1))
-#    plt.plot(C_TN)
+    print('Erreur : ', np.min(np.abs(C_TN - c_1)/np.abs(c_1)))
+    print('Argmin : ', np.argmin(np.abs(C_TN - c_1)/np.abs(c_1)))
+#    plot_exp(env,X)
+    plt.plot(C_TN)
 #    env = Environnement(N = N, L = L, c0 = 1)
 #    #tau = 0
 #    C_TN = emp_cross_corr(tau, x1, x2, T, N, env)

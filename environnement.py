@@ -66,21 +66,38 @@ class Environnement():
         time_discretization = np.linspace(0, T, self.nb_timesteps)
 
         delta_T = (time_discretization[1] -  time_discretization[0])/T
-        freqs = np.fft.fftfreq(self.nb_timesteps, d=delta_T)
-        sum_gps_1 = np.zeros(len(freqs))
-        sum_gps_2 = np.zeros(len(freqs))
-        for j in range(self.N) : 
-            y_fourier = fft(np.random.randn(len(freqs)))
-            z_fourier = np.sqrt(self.fourier_cov(freqs)) * y_fourier
-            G_freqs_1 = np.array([self.G_hat(w,x1,self.ys[j]) for w in freqs])
-            G_freqs_2 = np.array([self.G_hat(w,x2,self.ys[j]) for w in freqs])
-            z_fourier = z_fourier
-            sum_gps_1 = sum_gps_1 + z_fourier*G_freqs_1
-            sum_gps_2 = sum_gps_2 + z_fourier*G_freqs_2
+#        freqs = np.fft.fftfreq(self.nb_timesteps, d=delta_T)
+#        sum_gps_1 = np.zeros(len(freqs))
+#        sum_gps_2 = np.zeros(len(freqs))
+#        for j in range(self.N) : 
+#            y_fourier = fft(np.random.randn(len(freqs)))
+#            z_fourier = np.sqrt(self.fourier_cov(freqs)) * y_fourier
+#            G_freqs_1 = np.array([self.G_hat(w,x1,self.ys[j]) for w in freqs])
+#            G_freqs_2 = np.array([self.G_hat(w,x2,self.ys[j]) for w in freqs])
+#            z_fourier = z_fourier
+#            sum_gps_1 = sum_gps_1 + z_fourier*G_freqs_1
+#            sum_gps_2 = sum_gps_2 + z_fourier*G_freqs_2
+#        
+#        signal_1 = np.real(ifft(sum_gps_1))
+#        signal_2 = np.real(ifft(sum_gps_2))
         
-        signal_1 = np.real(ifft(sum_gps_1))
-        signal_2 = np.real(ifft(sum_gps_2))
+        from scipy.signal import fftconvolve
         
+        random_signal = np.zeros((len(self.ys), len(time_discretization)))
+        signal_11 = np.zeros((len(self.ys), len(time_discretization)))
+        signal_21 = 1*signal_11
+        for k in range(len(self.ys)) :
+            random_signal[k, :] = generate_n_gp(time_discretization,self.fourier_cov,return_fourier = False)
+            signal_11[k, :] = np.array([self.G(t,x1,self.ys[k]) for t in time_discretization])
+            signal_21[k, :] = np.array([self.G(t,x2,self.ys[k]) for t in time_discretization])
+        
+        signal_1 = np.zeros((len(self.ys),len(time_discretization)))
+        signal_2 = 1*signal_1
+        for k in range(len(self.ys)) :
+            signal_1[k,:] = fftconvolve(signal_11[k,:],random_signal[k,:], mode = 'same')
+            signal_2[k,:] = fftconvolve(signal_21[k,:],random_signal[k,:], mode = 'same')
+        signal_1 = np.sum(signal_1,axis = 0)
+        signal_2 = np.sum(signal_2,axis = 0)
         #signal_1 = (signal_1 - np.mean(signal_1))/np.std(signal_1)
         #signal_2 = (signal_2 - np.mean(signal_2))/np.std(signal_2)
         
@@ -93,7 +110,7 @@ class Environnement():
 if __name__ == '__main__':
     env = Environnement(N=10, nb_timesteps= 111, c0 = 1, L = 50)
     x1 = x2 = np.ones(2)
-    x2 = x2 + 1/2*x1
+    x2 = 2*x2 
     tau = 1
     u1, u2, time, _ = env.compute_signal(x1, x2, 100)
     u1, u2 = u1, u2
