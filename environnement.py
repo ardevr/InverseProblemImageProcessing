@@ -98,8 +98,7 @@ class Environnement():
             signal_2[k,:] = fftconvolve(signal_21[k,:],random_signal[k,:], mode = 'same')
         signal_1 = np.sum(signal_1,axis = 0)
         signal_2 = np.sum(signal_2,axis = 0)
-        #signal_1 = (signal_1 - np.mean(signal_1))/np.std(signal_1)
-        #signal_2 = (signal_2 - np.mean(signal_2))/np.std(signal_2)
+   
         
 
         return self.c0/ np.sqrt(self.N) * \

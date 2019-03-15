@@ -25,20 +25,15 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     
     if verbose:
         print('Computing emp_cross_corr ...')
-    M = len (u_1)
-    u1_tilde = np.zeros(2*M)
-    u1_tilde[M:] = u_1
-    u2_tilde = np.zeros(2*M)
-    u2_tilde[M:] = u_2
-    other_cross = np.zeros(M)
-    for k in range(M) :
-        for j in range(2*M) :
-            other_cross[k] += 1/M*u1_tilde[j]*u2_tilde[(j+k)%(2*M)]
-    DFT_CT = fft(u2_tilde)*np.conjugate(fft(u1_tilde))*(-1)**np.linspace(0,2*M-1,2*M,dtype = 'int')
-    result = fftconvolve(u1[:-1],u2[1:])
+        M = len(u1)
+        u1_tilde = np.zeros(2*M)
+        u2_tilde = np.zeros(2*M)
+        u1_tilde[M:] = u1
+        u2_tilde[M:] = u2
+    result = fftconvolve(u1_tilde, u2_tilde)
     if verbose:
         print('Done')
-    return result, other_cross
+    return result[M:]
 
 def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
     if verbose:
@@ -117,7 +112,7 @@ if __name__ == '__main__':
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2 = X[0], X[1]
-    tau = 2
+    tau = 1
     fourier_cov = lambda w : w**2*np.exp(-w**2)
     mean = []
     import time
@@ -125,7 +120,7 @@ if __name__ == '__main__':
     for i in range(1) : 
         env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
         u1,u2,times,_ = env.compute_signal(x1, x2, T) 
-        C_TN,other_cross = emp_cross_corr(u1, u2, times, verbose=True)
+        C_TN = emp_cross_corr(u1, u2, times, verbose=True)
         mean.append(C_TN[0])
     fin = time.clock()
     mean = np.mean(np.array(mean))
