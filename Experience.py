@@ -25,15 +25,22 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     
     if verbose:
         print('Computing emp_cross_corr ...')
-        M = len(u1)
-        u1_tilde = np.zeros(2*M)
-        u2_tilde = np.zeros(2*M)
-        u1_tilde[M:] = u1
-        u2_tilde[M:] = u2
-    result = fftconvolve(u1_tilde, u2_tilde)
+    M = len(u1)
+    u1_tilde = np.zeros(2*M)
+    u2_tilde = np.zeros(2*M)
+    u1_tilde[M:] = u1
+    u2_tilde[M:] = u2
+    DFT_C = ((-1)**np.linspace(0,2*M-1,2*M,dtype = 'int'))*np.conjugate(fft(u1_tilde))*fft(u2_tilde)
+    result = fftconvolve(u1, u2,mode = 'full')/times[-1]
+    C_TN = ifft(DFT_C)/M
+    print(np.max(np.abs(np.imag(C_TN))))
+    C_TN = np.real(C_TN)
+    plt.figure(1)
+    plt.plot(C_TN)
+    plt.show()
     if verbose:
         print('Done')
-    return result[M:]
+    return C_TN
 
 def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
     if verbose:
@@ -79,7 +86,7 @@ def cross_1(tau, x1, x2, L, env, verbose=True):
     result,error = quad(f, a, b)
     if verbose:
         print('Done')
-    return result / (2 * np.pi**3)
+    return result / (8 * np.pi**3)
 
 def C_asy(tau, x1, x2,  env, verbose=True):
     if verbose:
@@ -108,22 +115,20 @@ def plot_exp(env,X) :
 
 if __name__ == '__main__':
 
-    L, N, T = 50, 100, 3*10**3
+    L, N, T = 50, 100, 10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2 = X[0], X[1]
-    tau = 1
     fourier_cov = lambda w : w**2*np.exp(-w**2)
-    mean = []
     import time
     debut = time.clock()
     for i in range(1) : 
-        env = Environnement(nb_timesteps = int(T/tau), L = L, N = N, fourier_cov= fourier_cov)
+        env = Environnement(nb_timesteps = int(3*T), L = L, N = N, fourier_cov= fourier_cov)
         u1,u2,times,_ = env.compute_signal(x1, x2, T) 
         C_TN = emp_cross_corr(u1, u2, times, verbose=True)
-        mean.append(C_TN[0])
+        
     fin = time.clock()
-    mean = np.mean(np.array(mean))
+    tau = T/env.nb_timesteps
     print('Temps emp_cross_corr : ', fin - debut)
     debut = time.clock()
     exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
@@ -139,9 +144,9 @@ if __name__ == '__main__':
     print('Temps C_asy : ', fin - debut)
     
     print('Erreur : ', np.min(np.abs(C_TN - c_1)/np.abs(c_1)))
-    print('Argmin : ', np.argmin(np.abs(C_TN - c_1)/np.abs(c_1)))
-#    plot_exp(env,X)
+    print('Argmin : ', np.argsort((np.abs(C_TN - c_1)/np.abs(c_1)))[:10])
     plt.plot(C_TN)
+#    plot_exp(env,X)
 #    env = Environnement(N = N, L = L, c0 = 1)
 #    #tau = 0
 #    C_TN = emp_cross_corr(tau, x1, x2, T, N, env)

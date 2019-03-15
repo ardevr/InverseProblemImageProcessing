@@ -47,7 +47,7 @@ class Environnement():
         
     def G(self,t, x, y) : 
             norm = np.linalg.norm(x - y)/self.c0
-            if t > norm/self.c0 : 
+            if t > norm: 
                 return 1/(2*np.pi*np.sqrt(t**2 - norm**2))
             else : 
                 return 0
@@ -65,7 +65,7 @@ class Environnement():
 
         time_discretization = np.linspace(0, T, self.nb_timesteps)
 
-        delta_T = (time_discretization[1] -  time_discretization[0])/T
+        #tau = (time_discretization[1] -  time_discretization[0])/T
 #        freqs = np.fft.fftfreq(self.nb_timesteps, d=delta_T)
 #        sum_gps_1 = np.zeros(len(freqs))
 #        sum_gps_2 = np.zeros(len(freqs))
@@ -86,10 +86,11 @@ class Environnement():
         random_signal = np.zeros((len(self.ys), len(time_discretization)))
         signal_11 = np.zeros((len(self.ys), len(time_discretization)))
         signal_21 = 1*signal_11
+        
         for k in range(len(self.ys)) :
             random_signal[k, :] = generate_n_gp(time_discretization,self.fourier_cov,return_fourier = False)
             signal_11[k, :] = np.array([self.G(t,x1,self.ys[k]) for t in time_discretization])
-            signal_21[k, :] = np.array([self.G(t,x2,self.ys[k]) for t in time_discretization])
+            signal_21[k, :] = np.array([self.G(t+tau,x2,self.ys[k]) for t in time_discretization])
         
         signal_1 = np.zeros((len(self.ys),len(time_discretization)))
         signal_2 = 1*signal_1
@@ -107,13 +108,13 @@ class Environnement():
 
 
 if __name__ == '__main__':
-    env = Environnement(N=10, nb_timesteps= 111, c0 = 1, L = 50)
+    env = Environnement(N=10, nb_timesteps= 10**3, c0 = 1, L = 50)
     x1 = x2 = np.ones(2)
-    x2 = 2*x2 
+    x2 = 1*x2 
     tau = 1
     u1, u2, time, _ = env.compute_signal(x1, x2, 100)
     u1, u2 = u1, u2
     import pylab as plt
-    plt.scatter(time, u1, color='red', label='u1')
-    plt.scatter(time, u2, color='blue', label='u2')
+    plt.plot(time, u1, color='red', label='u1')
+    plt.plot(time, u2, color='blue', label='u2')
     plt.legend()
