@@ -22,7 +22,7 @@ import warnings
 
 
 def emp_cross_corr(u_1, u_2, times, verbose=True) :
-    
+
     if verbose:
         print('Computing emp_cross_corr ...')
     M = len(u1)
@@ -31,13 +31,13 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     u1_tilde[M:] = u1
     u2_tilde[M:] = u2
     DFT_C = ((-1)**np.linspace(0,2*M-1,2*M,dtype = 'int'))*np.conjugate(fft(u1_tilde))*fft(u2_tilde)
-    result = fftconvolve(u1, u2,mode = 'full')/times[-1]
+    # result = fftconvolve(u1, u2,mode = 'full')/times[-1]
     C_TN = ifft(DFT_C)/M
-    print(np.max(np.abs(np.imag(C_TN))))
+    # print(np.max(np.abs(np.imag(C_TN))))
     C_TN = np.real(C_TN)
-    plt.figure(1)
-    plt.plot(C_TN)
-    plt.show()
+    # plt.figure(1)
+    # plt.plot(C_TN)
+    # plt.show()
     if verbose:
         print('Done')
     return C_TN
@@ -83,7 +83,7 @@ def cross_1(tau, x1, x2, L, env, verbose=True):
         return  1/8*(inte_1 + inte_2 + inte_3 + inte_4)
     b = 2 * np.pi
     a = 0
-    result,error = quad(f, a, b)
+    result,_ = quad(f, a, b)
     if verbose:
         print('Done')
     return result / (8 * np.pi**3)
@@ -110,6 +110,8 @@ def plot_exp(env,X) :
     plt.legend()
     plt.show()
 
+def estimated_c0(env,x1,x2,C_TN,tau):
+    return((x2[0]-x1[0])/(abs(C_TN.argmax()-env.nb_timesteps)*tau))
 
 
 
@@ -118,40 +120,86 @@ if __name__ == '__main__':
     L, N, T = 50, 100, 10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
-    x1, x2 = X[0], X[1]
+    x1, x2, x3, x4, x5 = X[0], X[1], X[2], X[3], X[4]
     fourier_cov = lambda w : w**2*np.exp(-w**2)
     import time
     debut = time.clock()
-    for i in range(1) : 
-        env = Environnement(nb_timesteps = int(3*T), L = L, N = N, fourier_cov= fourier_cov)
-        u1,u2,times,_ = env.compute_signal(x1, x2, T) 
-        C_TN = emp_cross_corr(u1, u2, times, verbose=True)
-        
+    env = Environnement(nb_timesteps = int(3*T), L = L, N = N, fourier_cov= fourier_cov)
+    Ninter = 2
+    C_TNinter = []
+    for i in range(Ninter) :
+        u1,u2,times,_ = env.compute_signal(x1, x2, T)
+        C_TNinter.append(emp_cross_corr(u1, u2, times, verbose=False))
+    C_TN = C_TNinter[0]
+    for i in range(1,len(C_TNinter)):
+        C_TN = C_TNinter[i] +C_TN
+    C_TN = C_TN/len(C_TNinter)
     fin = time.clock()
     tau = T/env.nb_timesteps
     print('Temps emp_cross_corr : ', fin - debut)
-    debut = time.clock()
-    exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
-    fin = time.clock()
-    print('Temps exp emp corr : ', fin - debut)
-    debut = time.clock()
-    c_1 = cross_1(tau, x1, x2, L, env)
-    fin = time.clock()
-    print('Temps cross_1 : ', fin - debut)
-    debut = time.clock()
-    c_asy = C_asy(tau, x1, x2, env)
-    fin = time.clock()
-    print('Temps C_asy : ', fin - debut)
-    
-    print('Erreur : ', np.min(np.abs(C_TN - c_1)/np.abs(c_1)))
-    print('Argmin : ', np.argsort((np.abs(C_TN - c_1)/np.abs(c_1)))[:10])
-    plt.plot(C_TN)
+    # debut = time.clock()
+    # exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
+    # fin = time.clock()
+    # print('Temps exp emp corr : ', fin - debut)
+    # debut = time.clock()
+    # c_1 = cross_1(tau, x1, x2, L, env)
+    # fin = time.clock()
+    # print('Temps cross_1 : ', fin - debut)
+    # debut = time.clock()
+    # c_asy = C_asy(tau, x1, x2, env)
+    # fin = time.clock()
+    # print('Temps C_asy : ', fin - debut)
+
+    # print('Erreur : ', np.min(np.abs(C_TN - c_1)/np.abs(c_1)))
+    # print('Argmin : ', np.argsort((np.abs(C_TN - c_1)/np.abs(c_1)))[:10])
+    # plt.plot(C_TN)
+    # plt.show()
+    # print(max(C_TN),c_asy,c_1,exp_emp_corr)
+
+    # Question 3
+    # x2 = x1
+    # u1,u2,times,_ = env.compute_signal(x1, x2, T)
+    # C_TN=emp_cross_corr(u1, u2, times, verbose=False)
+    # c_asy = C_asy(tau, x1, x2, env)
+    # c_1 = cross_1(tau, x1, x2, L, env)
+    # exp_emp_corr = exp_emp_cross_cor(tau, x1, x2, N, env)
+    # print(max(C_TN),c_asy,c_1,exp_emp_corr)
+
+    # Question 4
+    # c0= 3
+    # x2 = x5
+    # env = Environnement(nb_timesteps = int(3*T), L = L, N = N, fourier_cov= fourier_cov,c0=c0)
+    # Ninter = 7
+    # C_TNinter = []
+    # for i in range(Ninter) :
+    #     u1,u2,times,_ = env.compute_signal(x1, x2, T)
+    #     C_TNinter.append(emp_cross_corr(u1, u2, times, verbose=False))
+    # C_TN = C_TNinter[0]
+    # for i in range(1,len(C_TNinter)):
+    #     C_TN = C_TNinter[i] +C_TN
+    # C_TN = C_TN/len(C_TNinter)
+    # print(estimated_c0(env,x1,x2,C_TN,tau),c0)
+
+    # Evaluation of the error
+    speed = np.linspace(0.1,5,50000)
+    erreur = []
+    for i in range(len(speed)):
+        erreur.append( ((x2[0]-x1[0])/int((x2[0]-x1[0])/speed[i])-speed[i])/speed[i]*100)
+    # pour c0 > 5 l'erreur est très grande car l'écart mesurable est inférieur à la distance
+    plt.plot(speed,erreur)
+    plt.title("Error evaluation on the speed estimation with the distance/time ratio")
+    plt.xlabel("Speed c0")
+    plt.ylabel("Error %")
+    plt.show()
+
+#### La suite n'est pas utile non?
+
 #    plot_exp(env,X)
 #    env = Environnement(N = N, L = L, c0 = 1)
 #    #tau = 0
 #    C_TN = emp_cross_corr(tau, x1, x2, T, N, env)
 #    estimated_c0 = 8*np.pi**(3/2)*C_TN
-    
+
 #    with warnings.catch_warnings():
 #        warnings.filterwarnings("ignore",category=RuntimeWarning)
 #        # Question 1
@@ -190,7 +238,7 @@ if __name__ == '__main__':
 #        plt.show()
 #
 #        # Question 2
-#        
+#
 #        Ns,Ts = np.linspace(10,100), np.linspace(100,10**4)
 #        nb_repetitions = 20
 #        c_tns = np.zeros((len(Ns), len(Ts), nb_repetitions))
@@ -208,11 +256,3 @@ if __name__ == '__main__':
 #        plt.ylabel('Regret')``
 
         # Question 3
-        
-        # Question 4 
-        
-       
-        
-        
-#
-#     TODO ecrire estimation de c0

@@ -65,7 +65,7 @@ class Environnement():
 
         time_discretization = np.linspace(0, T, self.nb_timesteps)
 
-        #tau = (time_discretization[1] -  time_discretization[0])/T
+        tau = (time_discretization[1] -  time_discretization[0])/T
 #        freqs = np.fft.fftfreq(self.nb_timesteps, d=delta_T)
 #        sum_gps_1 = np.zeros(len(freqs))
 #        sum_gps_2 = np.zeros(len(freqs))
@@ -111,10 +111,10 @@ if __name__ == '__main__':
     env = Environnement(N=10, nb_timesteps= 10**3, c0 = 1, L = 50)
     x1 = x2 = np.ones(2)
     x2 = 1*x2 
-    tau = 1
     u1, u2, time, _ = env.compute_signal(x1, x2, 100)
     u1, u2 = u1, u2
     import pylab as plt
     plt.plot(time, u1, color='red', label='u1')
     plt.plot(time, u2, color='blue', label='u2')
     plt.legend()
+    plt.show()
