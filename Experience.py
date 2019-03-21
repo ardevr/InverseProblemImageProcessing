@@ -164,6 +164,7 @@ def plot_exp_emp_cross(x1, x2, env, low_tau=1, high_tau=50, nb_steps=100):
     return result
 
 
+# Initialisation of the main environnement
 L, N, T = 50, 300, 10**3
 X = np.zeros((5, 2))
 X[:, 0] = -15 + 5 * np.linspace(1, 5, 5, dtype='int')
@@ -175,6 +176,8 @@ def fourier_cov(w): return w**2 * np.exp(-w**2)
 
 # Question 1/ Comparaison of C_1, C_TN, C_asy, expectation with respect to
 # the sources
+
+# Computation of C_TN, c_1 , c_N and C_asy
 env = Environnement(nb_timesteps=8000, L=L, N=N, fourier_cov=fourier_cov)
 u1, u2, times, _ = env.compute_signal(x1, x3, T)
 C_TNs[k, :] = emp_cross_corr(u1, u2, times, verbose=True)
@@ -252,10 +255,10 @@ plt.plot()
 plt.legend()
 plt.show()
 
-# %%
 
 # Question 2 / Variance of C_TN
 
+# Statistical stability of C_TN on N ans T
 nb_repetitions = 10
 nb_timesteps = 5000
 high_N, low_N = 300, 100
@@ -328,7 +331,6 @@ plt.plot(Ns, mean_C, linewidth=1.5, color='green',
 plt.xlabel('N')
 plt.show()
 
-# %%
 
 # Question 3 / Autocorrelation function
 
@@ -352,10 +354,9 @@ plt.plot(taus, result_autocor, label='C_asy autocorr',
 plt.legend()
 plt.show()
 
-
-# %%
-
 # Question 4 /  Evaluation of the error
+
+# Evaluation of the speed estimation error
 L, N, T = 50, 300, 1000
 nb_steps = 7
 
@@ -380,4 +381,24 @@ for i in trange(len(speed), desc='Computing c0', disable=False):
     print('time_estimator : ', time_estimator)
     erreur.append(np.abs(estimator - c))
 erreur = np.array(erreur) / speed
-# %%
+
+# Spatial evolution of C_asy
+env = Environnement(nb_timesteps=8000, L=L, N=N,
+                    fourier_cov=fourier_cov, c0=1, describe=True)
+res = np.zeros((5, 100))
+for j in range(5):
+    res[j] = plot_c_asy(x1, X[j], env, low_tau=-20, high_tau=20, nb_steps=100)
+time = np.linspace(-20, 20, 100)
+plt.figure(1)
+plt.subplot(5, 1, 1)
+plt.plot(time, res[0], linewidth=1, color='blue')
+plt.subplot(5, 1, 2)
+plt.plot(time, res[1], linewidth=1, color='blue')
+plt.subplot(5, 1, 3)
+plt.plot(time, res[2], linewidth=1, color='blue')
+plt.subplot(5, 1, 4)
+plt.plot(time, res[3], linewidth=1, color='blue')
+plt.subplot(5, 1, 5)
+plt.plot(time, res[4], linewidth=1, color='blue')
+plt.xlabel(r'$\tau$')
+plt.show()
