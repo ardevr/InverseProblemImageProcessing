@@ -22,7 +22,7 @@ from numpy.fft import fft, ifft
 # import warnings
 
 
-def emp_cross_corr(u_1, u_2, times, verbose=True) :
+def emp_cross_corr(u_1, u_2, times, verbose=True, all_data = False) :
 
     if verbose:
         print('Computing emp_cross_corr ...')
@@ -36,7 +36,10 @@ def emp_cross_corr(u_1, u_2, times, verbose=True) :
     C_TN = np.real(C_TN)
     if verbose:
         print('Done')
-    return C_TN
+    if not all_data :
+        return C_TN[M:]
+    else :
+        return C_TN
 
 def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
     if verbose:
@@ -50,12 +53,12 @@ def exp_emp_cross_cor(tau, x1, x2, N, env, verbose=True):
         y = ys[i]
         norme_1 = np.linalg.norm(x1 - y)/c0
         norme_2 = np.linalg.norm(x2 - y)/c0
-        a, b = -np.inf, +np.inf
-        inte_1,_ = quad(lambda w : F_hat(w)*np.imag(hankel1(0,w*norme_1))*np.imag(hankel1(0,w*norme_2))*np.cos(w*tau),a,b, limit = 100)
-        inte_2,_ = quad(lambda w : F_hat(w)*np.imag(hankel1(0,w*norme_2))*np.real(hankel1(0,w*norme_1))*np.sin(w*tau),a,b, limit = 100)
-        inte_3,_ = quad(lambda w : -F_hat(w)*np.imag(hankel1(0,w*norme_1))*np.real(hankel1(0,w*norme_2))*np.sin(w*tau),a,b, limit = 100)
-        inte_4,_ = quad(lambda w : F_hat(w)*np.real(hankel1(0,w*norme_1))*np.real(hankel1(0,w*norme_2))*np.cos(w*tau),a,b, limit = 100)
-        temp_result =  1/16*(inte_1 + inte_2 + inte_3 + inte_4)
+        a, b = 0, 5
+        inte_1,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*y0(w*norme_2)*np.cos(w*tau),a,b, limit = 300)
+        inte_2,_ = quad(lambda w : F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 300)
+        inte_3,_ = quad(lambda w : -F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 300)
+        inte_4,_ = quad(lambda w : F_hat(w)*j0(w*norme_1)*j0(w*norme_2)*np.cos(w*tau),a,b, limit = 300)
+        temp_result = 1/8*(inte_1 + inte_2 + inte_3 + inte_4)
         temp_cor += temp_result
         i = i+1
     if verbose:
@@ -72,20 +75,20 @@ def cross_1(tau, x1, x2, L, env, verbose=True):
         y = L*np.array([np.cos(theta),np.sin(theta)])
         norme_1 = np.linalg.norm(x1 - y)/c0
         norme_2 = np.linalg.norm(x2 - y)/c0
-        a, b = 0, +np.inf
-        inte_1,_ = quad(lambda w : F_hat(w)*np.imag(hankel1(0,w*norme_1))*np.imag(hankel1(0,w*norme_2))*np.cos(w*tau),a,b, limit = 100)
-        inte_2,_ = quad(lambda w : F_hat(w)*np.imag(hankel1(0,w*norme_2))*np.real(hankel1(0,w*norme_1))*np.sin(w*tau),a,b, limit = 100)
-        inte_3,_ = quad(lambda w : -F_hat(w)*np.imag(hankel1(0,w*norme_1))*np.real(hankel1(0,w*norme_2))*np.sin(w*tau),a,b, limit = 100)
-        inte_4,_ = quad(lambda w : F_hat(w)*np.real(hankel1(0,w*norme_1))*np.real(hankel1(0,w*norme_2))*np.cos(w*tau),a,b, limit = 100)
+        a, b = 0, 5
+        inte_1,_ = quad(lambda w : F_hat(w)*y0(w*norme_1)*y0(w*norme_2)*np.cos(w*tau),a,b, limit = 300)
+        inte_2,_ = quad(lambda w : F_hat(w)*y0(w*norme_2)*j0(w*norme_1)*np.sin(w*tau),a,b, limit = 300)
+        inte_3,_ = quad(lambda w : -F_hat(w)*y0(w*norme_1)*j0(w*norme_2)*np.sin(w*tau),a,b, limit = 300)
+        inte_4,_ = quad(lambda w : F_hat(w)*j0(w*norme_1)*j0(w*norme_2)*np.cos(w*tau),a,b, limit = 300)
         return  1/8*(inte_1 + inte_2 + inte_3 + inte_4)
- #       f = lambda w : np.real(F_hat(w)*np.conjugate(1j/4*hankel1(0,w*norme_1))
- #       *1j/4*hankel1(0,w*norme_2)*np.exp(-1j*tau*w))
- #       temp_res, err = quad(f,a,b)
- #      return temp_res
+#        f = lambda w : np.real(F_hat(w)*np.conjugate(1j/4*hankel1(0,w*norme_1))
+#        *1j/4*hankel1(0,w*norme_2)*np.exp(-1j*tau*w))
+        temp_res, err = quad(f,a,b, limit = 300)
+        return temp_res
     
     b = 2 * np.pi
     a = 0
-    result,_ = quad(f, a, b)
+    result,_ = quad(f, a, b, limit = 300)
     if verbose:
         print('Done')
     return result / (2 * np.pi**2)
@@ -97,14 +100,16 @@ def C_asy(tau, x1, x2,  env, verbose=True, eps = 10**-10):
     norme = np.linalg.norm(x1-x2)/env.c0
     
     if norme > eps :
-        def f(w): return env.fourier_cov(w) * np.real(hankel1(0,w*norme)) * np.cos(w*tau) / w
-        result = env.c0*quad(f, a=-np.inf, b=+np.inf)[0]
+        def f(w): return env.fourier_cov(w) * j0(w*norme) * np.cos(w*tau) / w
+        result = env.c0*quad(f, a=0, b=+np.inf)[0]
+        result = 2*result
     else :
         F_hat = lambda w : env.fourier_cov(w)
         def f(theta):
             y = L*np.array([np.cos(theta),np.sin(theta)])
+            norme = np.linalg.norm(x1-y)/env.c0
             a, b = 0, +np.inf
-            inte, _ = quad(lambda w : np.cos(w*tau)*F_hat(w)*np.linalg.norm(env.G_hat(w,x1,y))**2, a, b)
+            inte, _ = quad(lambda w : np.cos(w*tau)*F_hat(w)*(j0(w*norme)**2 + np.nan_to_num(y0(w*norme))**2), a, b, limit = 300)
             return  1/8*inte
         a, b = 0, 2*np.pi
         result, _ = quad(f, a, b)
@@ -148,44 +153,60 @@ def plot_exp_emp_cross(x1, x2, env, low_tau = 1, high_tau = 50, nb_steps = 100):
         tau = taus[i]
         result[i] = exp_emp_cross_cor(tau, x1, x2, env.N, env, verbose=False)
     return result
-
+#%%
 
 if __name__ == '__main__':
         
-    L, N, T = 50, 100, 100
+    L, N, T = 50,300, 750
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2, x3, x4, x5 = X[0], X[1], X[2], X[3], X[4]
     fourier_cov = lambda w : w**2*np.exp(-w**2)
-    #%%
-    env = Environnement(nb_timesteps = 7000, L = L, N = N, fourier_cov= fourier_cov)
-    u1,u2,times,_ = env.compute_signal(x1, x2, T)
-    C_TN = emp_cross_corr(u1, u2, times, verbose=False)  
+    C_TNs = np.zeros((10, 8000))
+    for k in range(10) :
+        env = Environnement(nb_timesteps = 8000, L = L, N = N, fourier_cov= fourier_cov)
+        u1,u2,times,_ = env.compute_signal(x1, x3, T)
+        C_TNs[k,:] = emp_cross_corr(u1, u2, times, verbose=True) 
+    mean_c = np.mean(C_TNs, axis = 0)
+    nb_steps_asy = 500
+    nb_steps_c1 = 100
+    nb_steps_exp = 100
+    h_tau = 20
+    l_tau = times[0]
+    result_asy = plot_c_asy(x1,x3, env, low_tau = l_tau, high_tau = h_tau , nb_steps= nb_steps_asy)
+#    result_1 = plot_c_1(x1,x3, env, low_tau = l_tau, high_tau = h_tau, nb_steps= nb_steps_c1)
+#    result_2 = plot_exp_emp_cross(x1,x3, env, low_tau = l_tau, high_tau = h_tau, nb_steps= nb_steps_exp)
+  #%%  
+#    plt.figure(1)
+    taus_asy = np.linspace(l_tau, h_tau,nb_steps_asy)
+    taus_c1 = np.linspace(l_tau, h_tau,nb_steps_c1)
+    taus_emp = np.linspace(l_tau, h_tau,nb_steps_exp)
+#    plt.plot(taus_c1, 2*L*result_1, linewidth = 1.5, color = 'blue', label = 'C_1', marker = '+')
+#    plt.plot(taus_emp, 4*L*result_2, linewidth = 1.5, color = 'green', label = 'exp_emp_cross', marker = 'o')
+#    plt.plot(taus_asy, result_asy, linewidth = 1.5, color = 'red', label = 'C_asy', marker = '^')
+#    plt.legend()
     
-    nb_steps = 100
-    result_asy = plot_c_asy(x1,x3, env, low_tau = times[0], high_tau = times[-1], nb_steps= nb_steps)
-    result_1 = plot_c_1(x1,x3, env, low_tau = times[0], high_tau = times[-1], nb_steps= nb_steps)
-    result_2 = plot_exp_emp_cross(x1,x3, env, low_tau = times[0], high_tau = times[-1], nb_steps= nb_steps)
-    taus = np.linspace(times[0], times[-1],nb_steps)
-    plt.figure(1)
-    plt.plot(taus, 2*L*result_1, linewidth = 1.5, color = 'blue', label = 'C_1', marker = '+')
-    plt.plot(taus, 2*L*result_2, linewidth = 1.5, color = 'green', label = 'exp_emp_cross', marker = 'o')
-    plt.plot(taus, result_asy, linewidth = 1.5, color = 'red', label = 'C_asy', marker = '^')
-    plt.plot(times, 2*L*C_TN[len(u1):], linewidth = 1.5, color = 'magenta', label = 'Empirical Cross correlation')
+    plt.figure(2)
+    tau = times[-1]/(len(times)-1)
+    high_stop_limit = int(h_tau/tau)+1
+    #C_TN_1 = C_TN[:high_stop_limit]
+    C_TN_1 = mean_c[:high_stop_limit]
+    taus = np.linspace(0,h_tau, high_stop_limit)
+    plt.plot(taus, C_TN_1/1.5, linewidth = 1.5, color = 'blue', 
+             label = 'Empirical cross correlation', marker = 'o')
+    plt.plot(taus_asy, result_asy, linewidth = 1.5, color = 'red', label = 'C_asy', marker = '^')
     plt.plot()
     plt.legend()
     plt.show()
-    
     #%%
     
     nb_repetitions = 10
     nb_timesteps = 5000
-    high_N, low_N = 150, 30
-    high_T, low_T = 500, 100
-    Ns, Ts = np.linspace(low_N, high_N, 20, dtype = 'int'), np.linspace(low_T, high_T, 20, dtype = 'int')
-    tau_max = np.linalg.norm(x1-x3)
-    random_index_N = np.random.choice(
-            np.linspace(0,len(Ns)-1,len(Ns),dtype = 'int'))
+    high_N, low_N = 300, 100
+    high_T, low_T = 1000, 250
+    Ns, Ts = np.linspace(low_N, high_N, 10, dtype = 'int'), np.linspace(low_T, high_T, 20, dtype = 'int')
+    tau_max = np.linalg.norm(x1-x3) - 1
+    random_index_N = len(Ns)-1
     random_N = Ns[random_index_N]
 
     C_TNs = np.zeros((nb_repetitions, len(Ts)))
@@ -199,7 +220,7 @@ if __name__ == '__main__':
                                     fourier_cov= fourier_cov)
                 u1,u2,times,_ = env.compute_signal(x1, x3, T)
                 C_TN = emp_cross_corr(u1, u2, times, verbose=False) 
-                C_TN = C_TN[len(u1)+ index_tau_max]
+                C_TN = C_TN[index_tau_max]
                 C_TNs[i,j] = C_TN
     mean_C = np.mean(C_TNs, axis = 0)
     q = 0.1
@@ -208,12 +229,12 @@ if __name__ == '__main__':
     plt.figure(2)
     plt.fill_between(Ts, q_bound, Q_bound, alpha=0.15, linewidth=1.5, 
                      color='red')
-    plt.plot(Ts, mean_C, linewidth = 1.5, color ='red', marker = '^')
+    plt.plot(Ts, mean_C, linewidth = 1.5, color ='red', marker = '^', label = 'C_TN, N = {}'.format(random_N))
+    plt.xlabel('T')
     
-    random_index_T = np.random.choice(
-    np.linspace(0,len(Ts)-1,len(Ts),dtype = 'int'))
+    random_index_T = len(Ts)-1
     random_T = Ts[random_index_T]
-    C_TNs = np.zeros((nb_repetitions, len(Ts)))
+    C_TNs = np.zeros((nb_repetitions, len(Ns)))
     
     for i in range(nb_repetitions) :
         for j in range(len(Ns)) :
@@ -224,32 +245,42 @@ if __name__ == '__main__':
                                     fourier_cov= fourier_cov)
                 u1,u2,times,_ = env.compute_signal(x1, x3, T)
                 C_TN = emp_cross_corr(u1, u2, times, verbose=False) 
-                C_TN = C_TN[len(u1)+ index_tau_max]
+                C_TN = C_TN[index_tau_max]
                 C_TNs[i,j] = C_TN
     mean_C = np.mean(C_TNs, axis = 0)
     q_bound = np.quantile(C_TNs, q, axis = 0)
     Q_bound = np.quantile(C_TNs, 1-q, axis = 0)
     plt.figure(3)
     plt.fill_between(Ns, q_bound, Q_bound, alpha=0.15, linewidth=1.5, color='green')
-    plt.plot(Ns, mean_C, linewidth = 1.5, color ='green', marker = 'o')
+    plt.plot(Ns, mean_C, linewidth = 1.5, color ='green', marker = 'o', label = 'C_TN, T = {}'.format(T))
+    plt.xlabel('N')
     plt.show()
     
     #%%
-    L, N, T = 50, 100, 250
-    nb_steps = 50
+    L, N, T = 50, 300, 1000
+    h_tau = 20
+    l_tau = -20
+    nb_steps = 100
     fourier_cov = lambda w : w**2*np.exp(-w**2)
     env = Environnement(nb_timesteps = 7000, L = L, N = N, 
                         fourier_cov= fourier_cov)
-    u1,u2,times,_ = env.compute_signal(x1, x1, T)
-    result_autocor = plot_c_asy(x1,x1,env,high_tau=T, low_tau = 10**-4, 
-                                nb_steps= nb_steps)
-    C_TN = emp_cross_corr(u1, u2, times, verbose=False) 
+    #u1,u2,times,_ = env.compute_signal(x1, x1, T)
+    #result_autocor = plot_c_asy(x1,x1,env,high_tau=h_tau, low_tau = l_tau, 
+    #                            nb_steps= nb_steps)
+    #C_TN = emp_cross_corr(u1, u2, times, verbose=False, all_data = True) 
     plt.figure(4)
-    taus = np.linspace(10**-4,T, nb_steps)
+    taus = np.linspace(l_tau,h_tau, nb_steps)
     plt.plot(taus, result_autocor, label = 'C_asy autocorr', 
              linewidth = 1.5, color = 'red', marker = '^')
-    plt.plot(times, C_TN[len(u1):], linewidth = 1.5, color = 'blue', 
-             label = 'Empirical cross correlation')
+    f = lambda t : (1 - 2*t**2)*np.exp(-t**2)/(6*8)
+    plt.plot(taus, f(taus), linewidth = 1, color = 'blue')
+    #tau = times[-1]/(len(times)-1)
+    #high_stop_limit = int(h_tau/tau)+1
+    #low_stop_limit = int(np.abs(l_tau)/tau)+1
+    #C_TN = C_TN[len(u1) - low_stop_limit : len(u1) + high_stop_limit]
+    #taus = np.linspace(l_tau,h_tau, high_stop_limit + low_stop_limit)
+    #plt.plot(taus, C_TN, linewidth = 1.5, color = 'blue', 
+    #         label = 'Empirical cross correlation', marker = 'o')
     plt.legend()
     plt.show()
     
@@ -257,22 +288,25 @@ if __name__ == '__main__':
     #%%
     
     # Evaluation of the error
-    L, N, T = 50, 100, 250
-    nb_steps = 50
+    L, N, T = 50, 300, 1000
+    nb_steps = 5
     fourier_cov = lambda w : w**2*np.exp(-w**2)
-    speed = np.linspace(0.1,5,10)
+    speed = np.linspace(0.1,2,nb_steps)
+    #speed = np.array([2])
     erreur = []
-    for i in trange(len(speed), desc = 'Computing c0'):
+    for i in trange(len(speed), desc = 'Computing c0', disable = False):
         c = speed[i]
-        env = Environnement(nb_timesteps = 3000, L = L, N = N, 
-                        fourier_cov= fourier_cov, c0 = c)
-        u1,u2,times,_ = env.compute_signal(x1, x3, T)
-        C_TN = emp_cross_corr(u1, u2, times, verbose = False)[len(u1):]
+        env = Environnement(nb_timesteps = 8000, L = L, N = N, 
+                        fourier_cov= fourier_cov, c0 = c, describe = True)
+        u1,u2,times,_ = env.compute_signal(x1, x2, T)
+        C_TN = emp_cross_corr(u1, u2, times, verbose = False, all_data = False)
         argmax_index = np.argmax(C_TN)
         time_estimator = times[argmax_index]
         
-        estimator = np.linalg.norm(x1-x3)/time_estimator
+        estimator = np.linalg.norm(x1-x2)/(time_estimator-1)
         print('estimator : ', estimator)
+        print('c0 : ', c)
+        print('time_estimator : ', time_estimator)
         erreur.append(np.abs(estimator - c))
     erreur = np.array(erreur)
     # pour c0 > 5 l'erreur est très grande car l'écart mesurable est inférieur à la distance
@@ -282,7 +316,25 @@ if __name__ == '__main__':
     plt.ylabel("Error")
     plt.show()
 #%%
-    
+env = Environnement(nb_timesteps = 8000, L = L, N = N, 
+                        fourier_cov= fourier_cov, c0 = 1, describe = True)
+res = np.zeros((5,100))
+for j in range(5) :
+    res[j] = plot_c_asy(x1, X[j], env, low_tau = -20, high_tau = 20, nb_steps = 100)
+#%%
+time = np.linspace(-20,20,100)
+plt.figure(1)
+plt.subplot(5,1,1)
+plt.plot(time,res[0], linewidth = 1, color = 'blue')
+plt.subplot(5,1,2)
+plt.plot(time,res[1], linewidth = 1, color = 'blue')
+plt.subplot(5,1,3)
+plt.plot(time,res[2], linewidth = 1, color = 'blue')
+plt.subplot(5,1,4)
+plt.plot(time,res[3], linewidth = 1, color = 'blue')
+plt.subplot(5,1,5)
+plt.plot(time,res[4], linewidth = 1, color = 'blue') 
+plt.xlabel(r'$\tau$')  
                 
                 
     
