@@ -5,7 +5,7 @@ Created on Fri Mar  1 09:21:30 2019
 
 @author: evrardgarcelon
 """
-
+#%%
 import numpy as np
 
 from environnement import Environnement
@@ -127,8 +127,9 @@ def plot_exp(env,X) :
     plt.legend()
     plt.show()
 
-def estimated_c0(env,x1,x2,C_TN,tau):
-    return((x2[0]-x1[0])/(abs(C_TN.argmax()-env.nb_timesteps)*tau))
+def estimated_c0(times,x1,x2,C_TN,tau):
+    time_estimator = times[np.argmax(C_TN)]
+    return(np.linalg.norm(x1-x2)/(time_estimator+1/2))
     
 def plot_c_asy(x1, x2, env, low_tau = 1, high_tau = 50, nb_steps = 100) :
     taus = np.linspace(low_tau, high_tau, nb_steps)
@@ -156,13 +157,16 @@ def plot_exp_emp_cross(x1, x2, env, low_tau = 1, high_tau = 50, nb_steps = 100):
 #%%
 
 if __name__ == '__main__':
-        
+
+# Initialisation of the main environnement
     L, N, T = 50,300, 10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2, x3, x4, x5 = X[0], X[1], X[2], X[3], X[4]
     fourier_cov = lambda w : w**2*np.exp(-w**2)
 #%%
+
+# Computation of C_TN, c_1 , c_N and C_asy
     C_TNs = np.zeros((10, 8000))
     for k in range(10) :
         env = Environnement(nb_timesteps = 8000, L = L, N = N, fourier_cov= fourier_cov)
@@ -199,8 +203,7 @@ if __name__ == '__main__':
     plt.plot()
     plt.legend()
     plt.show()
-    #%%
-    
+
     nb_repetitions = 10
     nb_timesteps = 5000
     high_N, low_N = 300, 100
@@ -233,6 +236,7 @@ if __name__ == '__main__':
     plt.plot(Ts, mean_C, linewidth = 1.5, color ='red', marker = '^', label = 'C_TN, N = {}'.format(random_N))
     plt.xlabel('T')
 #%%    
+# Statistical stability of C_TN on N ans T
     random_index_T = len(Ts)-1
     random_T = Ts[random_index_T]
     C_TNs = np.zeros((nb_repetitions, len(Ns)))
@@ -258,6 +262,7 @@ if __name__ == '__main__':
     plt.show()
     
     #%%
+# Autocorrelation function
     L, N, T = 50, 300, 1000
     h_tau = 20
     l_tau = -20
@@ -288,7 +293,7 @@ if __name__ == '__main__':
     
     #%%
     
-    # Evaluation of the error
+    # Evaluation of the speed estimation error
     L, N, T = 50, 300, 700
     nb_steps = 7
     fourier_cov = lambda w : w**2*np.exp(-w**2)
@@ -302,7 +307,6 @@ if __name__ == '__main__':
         u1,u2,times,_ = env.compute_signal(x1, x2, T)
         C_TN = emp_cross_corr(u1, u2, times, verbose = False, all_data = False)
         argmax_index = np.argmax(C_TN)
-        plt.show()
         time_estimator = times[argmax_index]
         estimator = np.linalg.norm(x1-x2)/(time_estimator+1/2)
         print('estimator : ', estimator)
@@ -318,6 +322,7 @@ if __name__ == '__main__':
     plt.ylabel("Relative Error")
     plt.show()
 #%%
+# Spatial evolution of C_asy
 env = Environnement(nb_timesteps = 8000, L = L, N = N, 
                         fourier_cov= fourier_cov, c0 = 1, describe = True)
 res = np.zeros((5,100))
@@ -336,6 +341,4 @@ plt.plot(time,res[3], linewidth = 1, color = 'blue')
 plt.subplot(5,1,5)
 plt.plot(time,res[4], linewidth = 1, color = 'blue') 
 plt.xlabel(r'$\tau$')  
-                
-                
-    
+plt.show()
