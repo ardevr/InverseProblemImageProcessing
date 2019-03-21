@@ -157,11 +157,12 @@ def plot_exp_emp_cross(x1, x2, env, low_tau = 1, high_tau = 50, nb_steps = 100):
 
 if __name__ == '__main__':
         
-    L, N, T = 50,300, 750
+    L, N, T = 50,300, 10**3
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2, x3, x4, x5 = X[0], X[1], X[2], X[3], X[4]
     fourier_cov = lambda w : w**2*np.exp(-w**2)
+#%%
     C_TNs = np.zeros((10, 8000))
     for k in range(10) :
         env = Environnement(nb_timesteps = 8000, L = L, N = N, fourier_cov= fourier_cov)
@@ -231,7 +232,7 @@ if __name__ == '__main__':
                      color='red')
     plt.plot(Ts, mean_C, linewidth = 1.5, color ='red', marker = '^', label = 'C_TN, N = {}'.format(random_N))
     plt.xlabel('T')
-    
+#%%    
     random_index_T = len(Ts)-1
     random_T = Ts[random_index_T]
     C_TNs = np.zeros((nb_repetitions, len(Ns)))
@@ -265,14 +266,14 @@ if __name__ == '__main__':
     env = Environnement(nb_timesteps = 7000, L = L, N = N, 
                         fourier_cov= fourier_cov)
     #u1,u2,times,_ = env.compute_signal(x1, x1, T)
-    #result_autocor = plot_c_asy(x1,x1,env,high_tau=h_tau, low_tau = l_tau, 
-    #                            nb_steps= nb_steps)
+    result_autocor = plot_c_asy(x1,x1,env,high_tau=h_tau, low_tau = l_tau, 
+                                nb_steps= nb_steps)
     #C_TN = emp_cross_corr(u1, u2, times, verbose=False, all_data = True) 
     plt.figure(4)
     taus = np.linspace(l_tau,h_tau, nb_steps)
     plt.plot(taus, result_autocor, label = 'C_asy autocorr', 
              linewidth = 1.5, color = 'red', marker = '^')
-    f = lambda t : (1 - 2*t**2)*np.exp(-t**2)/(6*8)
+    f = lambda t : (1 - 2*(t/2.1)**2)*np.exp(-(t/2.1)**2)/(6*8)
     plt.plot(taus, f(taus), linewidth = 1, color = 'blue')
     #tau = times[-1]/(len(times)-1)
     #high_stop_limit = int(h_tau/tau)+1
@@ -288,32 +289,33 @@ if __name__ == '__main__':
     #%%
     
     # Evaluation of the error
-    L, N, T = 50, 300, 1000
-    nb_steps = 5
+    L, N, T = 50, 300, 700
+    nb_steps = 7
     fourier_cov = lambda w : w**2*np.exp(-w**2)
-    speed = np.linspace(0.1,2,nb_steps)
+    speed = np.linspace(0.2,2,nb_steps)
     #speed = np.array([2])
     erreur = []
     for i in trange(len(speed), desc = 'Computing c0', disable = False):
         c = speed[i]
-        env = Environnement(nb_timesteps = 8000, L = L, N = N, 
-                        fourier_cov= fourier_cov, c0 = c, describe = True)
+        env = Environnement(nb_timesteps = 3*10**4, L = L, N = N, 
+                        fourier_cov= fourier_cov, c0 = c, describe = False)
         u1,u2,times,_ = env.compute_signal(x1, x2, T)
         C_TN = emp_cross_corr(u1, u2, times, verbose = False, all_data = False)
         argmax_index = np.argmax(C_TN)
+        plt.show()
         time_estimator = times[argmax_index]
-        
-        estimator = np.linalg.norm(x1-x2)/(time_estimator-1)
+        estimator = np.linalg.norm(x1-x2)/(time_estimator+1/2)
         print('estimator : ', estimator)
         print('c0 : ', c)
         print('time_estimator : ', time_estimator)
         erreur.append(np.abs(estimator - c))
-    erreur = np.array(erreur)
+    erreur = np.array(erreur)/speed
+    #%%
     # pour c0 > 5 l'erreur est très grande car l'écart mesurable est inférieur à la distance
-    plt.plot(speed,erreur)
+    plt.plot(speed[1::],erreur[1::], linewidth = 1.5, color = 'red', marker = '1')
     plt.title("Error evaluation on the speed estimation with the distance/time ratio")
     plt.xlabel("Speed c0")
-    plt.ylabel("Error")
+    plt.ylabel("Relative Error")
     plt.show()
 #%%
 env = Environnement(nb_timesteps = 8000, L = L, N = N, 
@@ -321,7 +323,6 @@ env = Environnement(nb_timesteps = 8000, L = L, N = N,
 res = np.zeros((5,100))
 for j in range(5) :
     res[j] = plot_c_asy(x1, X[j], env, low_tau = -20, high_tau = 20, nb_steps = 100)
-#%%
 time = np.linspace(-20,20,100)
 plt.figure(1)
 plt.subplot(5,1,1)

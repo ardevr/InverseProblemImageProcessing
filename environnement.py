@@ -94,7 +94,7 @@ class Environnement():
 
 
 if __name__ == '__main__':
-    env = Environnement(N=30, nb_timesteps= 500, c0 = 1, L = 50)
+    env = Environnement(N=10**3, nb_timesteps= 500, c0 = 1, L = 50)
     X = np.zeros((5,2))
     X[:,0] = -15 + 5*np.linspace(1,5,5,dtype = 'int')
     x1, x2, x3, x4, x5 = X[0], X[1], X[2], X[3], X[4]
